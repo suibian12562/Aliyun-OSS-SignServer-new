@@ -5,6 +5,7 @@ project(Aliyun-OSS-SignServer-new
     DESCRIPTION "A Aliyun OSS sign server by cpp"
     VERSION 0.0.1
 )
+set(CMAKE_CXX_STANDARD 17)
 set(EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 add_executable(${PROJECT_NAME} src/main.cpp)
