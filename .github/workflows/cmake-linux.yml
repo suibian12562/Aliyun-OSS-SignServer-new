@@ -25,7 +25,7 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Check if code is checked out
-      run: ls -la /home/runner/work/Aliyun-OSS-SignServer-ws
+      run: ls -la ${{github.workspace}}
 
     - name: Set architecture
       run: echo "ARCHITECTURE=${{ matrix.architecture }}" >> $GITHUB_ENV
