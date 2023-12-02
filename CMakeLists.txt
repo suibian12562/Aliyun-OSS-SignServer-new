@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(Aliyun-OSS-SignServer-new
-    LANGUAGES CXX C
+    LANGUAGES CXX
     DESCRIPTION "A Aliyun OSS sign server by cpp"
     VERSION 0.0.1
 )
