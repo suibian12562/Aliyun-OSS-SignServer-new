@@ -1,0 +1,22 @@
+{
+    "name": "aliyun-oss-signserver-new",
+    "version": "0.1",
+    "dependencies": [
+      {
+        "name": "websocketpp"
+      },
+      {
+        "name": "nlohmann-json"
+      },
+      {
+        "name": "openssl"
+      },
+      {
+        "name": "curl"
+      },
+      {
+        "name":"cpp-netlib"
+      }
+    ]
+  }
+  
