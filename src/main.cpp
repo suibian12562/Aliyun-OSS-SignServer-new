@@ -60,27 +60,27 @@ Config readConfigFromFile(const std::string& filename) {
     return _config;
 }
 
-void genearateSignedUrl(const string _Endpoint,const string _Bucket, const string _GetobjectUrlName,string &_GenedUrl,long &_request_time) 
+void genearateSignedUrl(const string _Endpoint, const string _Bucket, const string _GetobjectUrlName, string &_GenedUrl, long &_request_time)
 {
     try
     {
-
     AlibabaCloud::OSS::ClientConfiguration conf;
     AlibabaCloud::OSS::OssClient client(_Endpoint, rconfig.AccessKeyId, rconfig.AccessKeySecret, conf);
-    std::time_t t = std::time(nullptr) + rconfig.sign_time;
 
-    auto genOutcome = client.GeneratePresignedUrl(_Bucket,_GetobjectUrlName, t, AlibabaCloud::OSS::Http::Get);
+    auto genOutcome = client.GeneratePresignedUrl(_Bucket, _GetobjectUrlName, _request_time, AlibabaCloud::OSS::Http::Get);
     if (genOutcome.isSuccess())
-    {
-        std::cout << "GeneratePresignedUrl success, Gen url: " << genOutcome.result().c_str() << std::endl;
-    }
+        {
+            std::cout << "GeneratePresignedUrl success, Gen url: " << genOutcome.result().c_str() << std::endl;
+            _GenedUrl = genOutcome.result().c_str();
+        }
     else
-    {
-        std::cout << "GeneratePresignedUrl fail, code: " << genOutcome.error().Code()
-                    << ", message: " << genOutcome.error().Message()
-                    << ", requestId: " << genOutcome.error().RequestId() << std::endl;
+        {
+            std::cout   << "GeneratePresignedUrl fail, code: " << genOutcome.error().Code()
+                        << ", message: " << genOutcome.error().Message()
+                        << ", requestId: " << genOutcome.error().RequestId() << std::endl;
+        }
     }
-    }catch (const Poco::Exception& e)
+    catch (const Poco::Exception &e)
     {
         std::cerr << "Error generating Presigned URL: " << e.displayText() << std::endl;
     }
@@ -92,22 +92,28 @@ class RequestHandler: public HTTPRequestHandler
     /// Return a HTML document with some JavaScript creating
     /// a WebSocket connection.
 {
+private:
+
 public:
     void handleRequest(HTTPServerRequest& request, HTTPServerResponse& response)
     {
         Poco::URI uri(request.getURI());
         message_info info;
-        
-        for (const auto& param : uri.getQueryParameters()) {
+        int if_cache = 0;
+
+        for (const auto& param : uri.getQueryParameters()) 
+        {
             if (param.first == "Endpoint") {
                 info._Endpoint = param.second;
-        } else if (param.first == "Bucket") {
-            info._Bucket = param.second;
-        } else if (param.first == "GetobjectUrlName") {
-            info._GetobjectUrlName = param.second;
-    } 
-}
+            } else if (param.first == "Bucket") {
+                info._Bucket = param.second;
+            } else if (param.first == "GetobjectUrlName") {
+                info._GetobjectUrlName = param.second;
+            } 
+        }
 
+        genearateSignedUrl(info._Endpoint, info._Bucket, info._GetobjectUrlName, info._GenedUrl, info._request_time);
+    
 
         Object::Ptr jsonInfo = info.toJSON();
 
@@ -116,8 +122,6 @@ public:
         response.setContentType("application/json");
         std::ostream& ostr = response.send();
         jsonInfo->stringify(ostr);
-
-
     }
 };
 
