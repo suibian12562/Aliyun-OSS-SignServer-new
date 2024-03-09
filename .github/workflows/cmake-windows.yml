@@ -49,7 +49,7 @@ jobs:
           with:
             path: |
               ./vcpkg
-              ./vcpkg_install
+              ./vcpkg_installed
             key: ${{ runner.os }}-${{ env.BUILD_TYPE }}-${{ hashFiles('./vcpkg.json')}}
             restore-keys: |
               vcpkg-
