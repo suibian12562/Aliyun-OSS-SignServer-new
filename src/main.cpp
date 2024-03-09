@@ -4,6 +4,44 @@ using namespace Poco::Net;
 using namespace Poco::JSON;
 Config rconfig;
 
+void createDefaultDatabase(const std::string& filename) {
+    int result = remove(filename.c_str());
+    if (result == 0) {
+        std::cout << "Deleted existing database" << std::endl;
+    } else {
+        std::cerr << "No existing database to delete" << std::endl;
+    }
+
+    std::cout << "Creating database..." << std::endl;
+    sqlite3* db;
+    char* errMsg = 0;
+
+    int rc = sqlite3_open(filename.c_str(), &db);
+    if (rc) {
+        std::cerr << "Error opening SQLite database: " << sqlite3_errmsg(db) << std::endl;
+    }
+
+const char* createTableSQL = "CREATE TABLE IF NOT EXISTS Cache ("
+                                "GetobjectUrlName TEXT PRIMARY KEY,"
+                                "GenedUrl TEXT,"
+                                "RequestTime INTEGER,"
+                                "ExpirationTime INTEGER"
+                                ")";
+    
+    rc = sqlite3_exec(db, createTableSQL, nullptr, nullptr, &errMsg);
+    if (rc != SQLITE_OK) {
+        std::cerr << "Error creating table: " << errMsg << std::endl;
+        sqlite3_free(errMsg);
+    } else {
+        std::cout << "Table created successfully" << std::endl;
+    }
+
+    // Close database connection
+    sqlite3_close(db);
+
+
+}
+
 
 void createDefaultConfig(const std::string& filename) {
     Config config;
@@ -86,39 +124,120 @@ void genearateSignedUrl(const string _Endpoint, const string _Bucket, const stri
     }
 }
 
-
-
-class RequestHandler: public HTTPRequestHandler
-    /// Return a HTML document with some JavaScript creating
-    /// a WebSocket connection.
-{
+class SQLiteCacheManager {
 private:
+    sqlite3* db;
 
 public:
-    void handleRequest(HTTPServerRequest& request, HTTPServerResponse& response)
-    {
+    SQLiteCacheManager() {
+        int rc = sqlite3_open("cache.db", &db);
+        if (rc) {
+            std::cerr << "Error opening SQLite database: " << sqlite3_errmsg(db) << std::endl;
+        } else {
+            std::cout << "Opened SQLite database successfully" << std::endl;
+        }
+    }
+
+    ~SQLiteCacheManager() {
+        sqlite3_close(db);
+    }
+
+    void saveToCache(const std::string& getObjectUrlName, const std::string& genedUrl, long requestTime, long cacheDuration) {
+        long expirationTime = requestTime + cacheDuration;
+        std::string sql = "INSERT OR REPLACE INTO Cache (GetobjectUrlName, GenedUrl, RequestTime, ExpirationTime) VALUES (?, ?, ?, ?)";
+        sqlite3_stmt* stmt;
+        int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
+        if (rc != SQLITE_OK) {
+            std::cerr << "Error preparing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+            return;
+        }
+
+        sqlite3_bind_text(stmt, 1, getObjectUrlName.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 2, genedUrl.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_int64(stmt, 3, requestTime);
+        sqlite3_bind_int64(stmt, 4, expirationTime);
+
+        rc = sqlite3_step(stmt);
+        if (rc != SQLITE_DONE) {
+            std::cerr << "Error executing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+        }
+
+        sqlite3_finalize(stmt);
+    }
+
+    bool getFromCache(const std::string& getObjectUrlName, std::string& genedUrl, long& requestTime) {
+    std::string sql = "SELECT GenedUrl, RequestTime, ExpirationTime FROM Cache WHERE GetobjectUrlName = ?";
+    sqlite3_stmt* stmt;
+    int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) {
+        std::cerr << "Error preparing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+        return false;
+    }
+
+    sqlite3_bind_text(stmt, 1, getObjectUrlName.c_str(), -1, SQLITE_STATIC);
+
+    rc = sqlite3_step(stmt);
+    if (rc == SQLITE_ROW) {
+        if (sqlite3_column_text(stmt, 0) != nullptr) {
+            genedUrl = std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)));
+        } else {
+            // Handle null or empty genedUrl
+            genedUrl = "";
+        }
+
+        requestTime = sqlite3_column_int64(stmt, 1);
+        long expirationTime = sqlite3_column_int64(stmt, 2);
+        sqlite3_finalize(stmt);
+
+        if (expirationTime > std::chrono::system_clock::now().time_since_epoch().count()) {
+            return true;
+        }
+    } else {
+        // Handle case when no row is found
+        std::cerr << "No data found for getObjectUrlName: " << getObjectUrlName << std::endl;
+    }
+
+    sqlite3_finalize(stmt);
+    return false;
+}
+};
+
+class RequestHandler: public Poco::Net::HTTPRequestHandler {
+private:
+    SQLiteCacheManager cacheManager;
+
+public:
+    void handleRequest(Poco::Net::HTTPServerRequest& request, Poco::Net::HTTPServerResponse& response) {
         Poco::URI uri(request.getURI());
         message_info info;
-        int if_cache = 0;
 
-        for (const auto& param : uri.getQueryParameters()) 
-        {
+        for (const auto& param : uri.getQueryParameters()) {
             if (param.first == "Endpoint") {
                 info._Endpoint = param.second;
             } else if (param.first == "Bucket") {
                 info._Bucket = param.second;
             } else if (param.first == "GetobjectUrlName") {
                 info._GetobjectUrlName = param.second;
-            } 
+            }
         }
 
-        genearateSignedUrl(info._Endpoint, info._Bucket, info._GetobjectUrlName, info._GenedUrl, info._request_time);
-    
+        std::string cachedUrl;
+        long requestTime;
+        if (cacheManager.getFromCache(info._GetobjectUrlName, cachedUrl, requestTime)) {
+            info._GenedUrl = cachedUrl;
+        } else {
+            // 生成签名URL
+            genearateSignedUrl(info._Endpoint, info._Bucket, info._GetobjectUrlName, info._GenedUrl, info._request_time);
 
-        Object::Ptr jsonInfo = info.toJSON();
+            // 保存到缓存
+            cacheManager.saveToCache(info._GetobjectUrlName, info._GenedUrl, info._request_time, 3600); // 缓存1小时
+        }
 
-        // 输出 JSON 对象
-        response.setStatus(HTTPResponse::HTTP_OK);
+        // 将消息信息转换为JSON对象
+        Poco::JSON::Object::Ptr jsonInfo = info.toJSON();
+
+        // 发送JSON响应
+        response.setStatus(Poco::Net::HTTPResponse::HTTP_OK);
         response.setContentType("application/json");
         std::ostream& ostr = response.send();
         jsonInfo->stringify(ostr);
@@ -221,6 +340,7 @@ protected:
 
         Config rconfig;
         rconfig = readConfigFromFile("config.json");
+        createDefaultDatabase("cache.db");
         // get parameters from configuration file
         std::cout << "Specified port: " << rconfig.port << std::endl;
         std::cout << "AccessKeyId: " << rconfig.AccessKeyId << std::endl;

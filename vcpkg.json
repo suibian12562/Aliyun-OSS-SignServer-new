@@ -16,6 +16,9 @@
       },
       {
         "name":"poco"
+      },
+      {
+        "name":"sqlite3"
       }
     ]
   }
