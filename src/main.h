@@ -76,7 +76,7 @@ struct message_info
 struct Config {
     std::string AccessKeyId;
     std::string AccessKeySecret;
-    long sign_time;
+    int sign_time;
     int port;
 };
 
