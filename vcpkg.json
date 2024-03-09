@@ -15,7 +15,7 @@
         "name": "curl"
       },
       {
-        "name":"cpp-netlib"
+        "name":"poco"
       }
     ]
   }
