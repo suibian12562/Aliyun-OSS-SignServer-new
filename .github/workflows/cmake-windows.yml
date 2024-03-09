@@ -3,9 +3,11 @@ on:
       branches:
         - main
         - action-test
+        - dev
     pull_request:
       branches:
         - main
+        - dev
   
 env:
     # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
@@ -47,6 +49,7 @@ jobs:
           with:
             path: |
               ./vcpkg
+              ./vcpkg_install
             key: ${{ runner.os }}-${{ env.BUILD_TYPE }}-${{ hashFiles('./vcpkg.json')}}
             restore-keys: |
               vcpkg-
