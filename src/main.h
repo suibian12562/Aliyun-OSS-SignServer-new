@@ -36,6 +36,7 @@
 #include "Poco/JSON/Stringifier.h"
 #include "Poco/Dynamic/Var.h"
 
+#include <sqlite3.h>
 
 #include "alibabacloud/oss/OssClient.h"  // 阿里云 OSS C++ SDK 头文件
 

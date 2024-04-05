@@ -3,7 +3,6 @@
 using namespace Poco::Net;
 using namespace Poco::JSON;
 Config rconfig;
-
 void createDefaultDatabase(const std::string& filename) {
     int result = remove(filename.c_str());
     if (result == 0) {
@@ -213,7 +212,7 @@ bool getFromCache(const std::string& getObjectUrlName, std::string& genedUrl, lo
 
 class RequestHandler: public Poco::Net::HTTPRequestHandler {
 private:
-
+SQLiteCacheManager cacheManager;
 public:
     void handleRequest(Poco::Net::HTTPServerRequest& request, Poco::Net::HTTPServerResponse& response) {
         Poco::URI uri(request.getURI());
@@ -241,9 +240,11 @@ public:
             genearateSignedUrl(info._Endpoint, info._Bucket, info._GetobjectUrlName, info._GenedUrl);
             cout<<"genearated"<<endl;
             // 保存到缓存
+            info._request_time = requestTime;
             cacheManager.saveToCache(info._GetobjectUrlName, info._GenedUrl,requestTime,rconfig.sign_time); // 缓存1小时
             cout<<"cached"<<endl;
-            cout<<info._GetobjectUrlName<<info._GenedUrl<<info._request_time<<"\a";
+            cout<<requestTime;
+            cout<<info._request_time;
 
         }
 
@@ -309,10 +310,10 @@ protected:
 
     int main(const std::vector<std::string>& args)
     {
-
-        Config rconfig;
         rconfig = readConfigFromFile("config.json");
+
         // get parameters from configuration file
+        cout<<rconfig.sign_time;
         std::cout << "Specified port: " << rconfig.port << std::endl;
         std::cout << "AccessKeyId: " << rconfig.AccessKeyId << std::endl;
         std::cout << "AccessKeySecret: " << rconfig.AccessKeySecret << std::endl;
