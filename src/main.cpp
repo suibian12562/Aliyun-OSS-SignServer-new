@@ -4,6 +4,43 @@ using namespace Poco::Net;
 using namespace Poco::JSON;
 Config rconfig;
 
+void createDefaultDatabase(const std::string& filename) {
+    int result = remove(filename.c_str());
+    if (result == 0) {
+        std::cout << "Deleted existing database" << std::endl;
+    } else {
+        std::cerr << "No existing database to delete" << std::endl;
+    }
+
+    std::cout << "Creating database..." << std::endl;
+    sqlite3* db;
+    char* errMsg = 0;
+
+    int rc = sqlite3_open(filename.c_str(), &db);
+    if (rc) {
+        std::cerr << "Error opening SQLite database: " << sqlite3_errmsg(db) << std::endl;
+    }
+
+const char* createTableSQL = "CREATE TABLE IF NOT EXISTS Cache ("
+                                "GetobjectUrlName TEXT PRIMARY KEY,"
+                                "GenedUrl TEXT,"
+                                "RequestTime INTEGER,"
+                                "ExpirationTime INTEGER"
+                                ")";
+    
+    rc = sqlite3_exec(db, createTableSQL, nullptr, nullptr, &errMsg);
+    if (rc != SQLITE_OK) {
+        std::cerr << "Error creating table: " << errMsg << std::endl;
+        sqlite3_free(errMsg);
+    } else {
+        std::cout << "Table created successfully" << std::endl;
+    }
+
+    // Close database connection
+    sqlite3_close(db);
+
+
+}
 void createDefaultConfig(const std::string& filename) {
     Config config;
     config.AccessKeyId = "your_access_key";
@@ -58,14 +95,15 @@ Config readConfigFromFile(const std::string& filename) {
     // Return the loaded config
     return _config;
 }
-void genearateSignedUrl(const string _Endpoint, const string _Bucket, const string _GetobjectUrlName, string &_GenedUrl, long &_request_time)
+
+void genearateSignedUrl(const string _Endpoint, const string _Bucket, const string _GetobjectUrlName, string &_GenedUrl)
 {
     try
     {
     AlibabaCloud::OSS::ClientConfiguration conf;
     AlibabaCloud::OSS::OssClient client(_Endpoint, rconfig.AccessKeyId, rconfig.AccessKeySecret, conf);
 
-    auto genOutcome = client.GeneratePresignedUrl(_Bucket, _GetobjectUrlName, _request_time, AlibabaCloud::OSS::Http::Get);
+    auto genOutcome = client.GeneratePresignedUrl(_Bucket, _GetobjectUrlName, rconfig.sign_time, AlibabaCloud::OSS::Http::Get);
     if (genOutcome.isSuccess())
         {
             std::cout << "GeneratePresignedUrl success, Gen url: " << genOutcome.result().c_str() << std::endl;
@@ -84,6 +122,95 @@ void genearateSignedUrl(const string _Endpoint, const string _Bucket, const stri
     }
 }
 
+class SQLiteCacheManager {
+private:
+    sqlite3* db;
+
+public:
+    SQLiteCacheManager() {
+        int rc = sqlite3_open("cache.db", &db);
+        if (rc) {
+            std::cerr << "Error opening SQLite database: " << sqlite3_errmsg(db) << std::endl;
+        } else {
+            std::cout << "Opened SQLite database successfully" << std::endl;
+        }
+    }
+
+    ~SQLiteCacheManager() {
+        sqlite3_close(db);
+    }
+
+    void saveToCache(const std::string& getObjectUrlName, const std::string& genedUrl, long requestTime, long cacheDuration) {
+        long expirationTime = requestTime + cacheDuration;
+        std::string sql = "INSERT OR REPLACE INTO Cache (GetobjectUrlName, GenedUrl, RequestTime, ExpirationTime) VALUES (?, ?, ?, ?)";
+        sqlite3_stmt* stmt;
+        int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
+        if (rc != SQLITE_OK) {
+            std::cerr << "Error preparing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+            return;
+        }
+
+        sqlite3_bind_text(stmt, 1, getObjectUrlName.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 2, genedUrl.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_int64(stmt, 3, requestTime);
+        sqlite3_bind_int64(stmt, 4, expirationTime);
+
+        rc = sqlite3_step(stmt);
+        if (rc != SQLITE_DONE) {
+            std::cerr << "Error executing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+        }
+
+        sqlite3_finalize(stmt);
+    }
+
+bool getFromCache(const std::string& getObjectUrlName, std::string& genedUrl, long& requestTime) {
+    if (getObjectUrlName.empty()) {
+        std::cerr << "getObjectUrlName is empty." << std::endl;
+        return false;
+    }
+
+    std::string sql = "SELECT GenedUrl, RequestTime, ExpirationTime FROM Cache WHERE GetobjectUrlName = ?";
+    sqlite3_stmt* stmt = nullptr; // 初始化为nullptr
+    int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) {
+        std::cerr << "Error preparing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+        return false;
+    }
+
+    rc = sqlite3_bind_text(stmt, 1, getObjectUrlName.c_str(), getObjectUrlName.size(), SQLITE_STATIC);
+    if (rc != SQLITE_OK) {
+        std::cerr << "Error binding parameter: " << sqlite3_errmsg(db) << std::endl;
+        sqlite3_finalize(stmt);
+        return false;
+    }
+
+    rc = sqlite3_step(stmt);
+    if (rc == SQLITE_ROW) {
+        if (sqlite3_column_text(stmt, 0) != nullptr) {
+            genedUrl = std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)));
+        }
+        requestTime = sqlite3_column_int64(stmt, 1);
+        long expirationTime = sqlite3_column_int64(stmt, 2);
+
+        if (expirationTime > std::chrono::system_clock::now().time_since_epoch().count()) {
+            sqlite3_finalize(stmt); // 在使用完stmt后释放资源
+            return true;
+        } else {
+            std::cerr << "Data expired for getObjectUrlName: " << getObjectUrlName << std::endl;
+        }
+    } else if (rc == SQLITE_DONE) {
+        std::cerr << "No data found for getObjectUrlName: " << getObjectUrlName << std::endl;
+    } else {
+        std::cerr << "Error executing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+    }
+
+    sqlite3_finalize(stmt); // 在所有返回路径上都确保释放stmt资源
+    return false;
+}
+
+
+};
+
 class RequestHandler: public Poco::Net::HTTPRequestHandler {
 private:
 
@@ -101,11 +228,24 @@ public:
                 info._GetobjectUrlName = param.second;
             }
         }
+        auto now = std::chrono::system_clock::now();
+        auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
+        long requestTime = static_cast<long>(timestamp);
 
         std::string cachedUrl;
-        long requestTime;
+        if (cacheManager.getFromCache(info._GetobjectUrlName, cachedUrl, requestTime)) {
+            info._GenedUrl = cachedUrl;
+            info._request_time = requestTime;
+        } else {
+            // 生成签名URL
+            genearateSignedUrl(info._Endpoint, info._Bucket, info._GetobjectUrlName, info._GenedUrl);
+            cout<<"genearated"<<endl;
+            // 保存到缓存
+            cacheManager.saveToCache(info._GetobjectUrlName, info._GenedUrl,requestTime,rconfig.sign_time); // 缓存1小时
+            cout<<"cached"<<endl;
+            cout<<info._GetobjectUrlName<<info._GenedUrl<<info._request_time<<"\a";
 
-        genearateSignedUrl(info._Endpoint, info._Bucket, info._GetobjectUrlName, info._GenedUrl, info._request_time);
+        }
 
         // 将消息信息转换为JSON对象
         Poco::JSON::Object::Ptr jsonInfo = info.toJSON();
