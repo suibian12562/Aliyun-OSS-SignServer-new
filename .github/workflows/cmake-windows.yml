@@ -90,5 +90,5 @@ jobs:
       - name: artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ runner.os }}-${{ env.BUILD_TYPE }}
-          path: ${{github.workspace}}/build/bin/${{ env.BUILD_TYPE }}/*
+          name: ${{ runner.os }}-${{ matrix.architecture }}-${{ env.BUILD_TYPE }}
+          path: ${{github.workspace}}/build/bin/*
