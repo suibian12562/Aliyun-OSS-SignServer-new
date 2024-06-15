@@ -1,12 +1,19 @@
 on:
   push:
-    branches: [ "main","action-test" ]
+    branches: 
+      - main
+      - action-test
+      - dev
   pull_request:
-    branches: [ "main" ]
+    branches: 
+      - main
+      - dev
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Release
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
 
 jobs:
   build:
@@ -22,9 +29,17 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
-    - name: Install git submodules
+    - name: Export GitHub Actions cache environment variables
+      uses: actions/github-script@v7
+      with:
+        script: |
+          core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+          core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');         
+
+
+    - name: Get git submodules
       run: git submodule update --init --recursive
 
     - name: Set architecture
@@ -33,7 +48,7 @@ jobs:
     - name: Install dependents
       run: |
         sudo apt-get update 
-        sudo apt-get install libcurl4-openssl-dev libssl-dev ninja-build tree -y
+        sudo apt-get install libcurl4-openssl-dev libssl-dev ninja-build -y
   
     - name: Install vcpkg
       run: |
@@ -42,26 +57,27 @@ jobs:
         ./bootstrap-vcpkg.sh
         ./vcpkg integrate install
 
-    - name: Cache
-      uses: actions/cache@v3
-      with:
-        # Assuming that vcpkg is installed in `~/vcpkg`
-        # Assuming that the build directory is `./build`
-        path: |
-          ./vcpkg
-        key: ${{ runner.os }}-${{ env.BUILD_TYPE }}-${{ hashFiles('./vcpkg.json')}}
-        restore-keys: |
-          vcpkg-
+    # - name: Cache
+    #   uses: actions/cache@v3
+    #   with:
+    #     # Assuming that vcpkg is installed in `~/vcpkg`
+    #     # Assuming that the build directory is `./build`
+    #     path: |
+    #       ./vcpkg
+    #       ./vcpkg_installed
+    #     key: ${{ runner.os }}-${{ env.BUILD_TYPE }}-${{ hashFiles('./vcpkg.json')}}
+    #     restore-keys: |
+    #       vcpkg-
 
     - name: Install vcpkg package
       run: |
         vcpkg install
 
-    - name: Save vcpkg Cache
-      uses: actions/cache@v3
-      with:
-        path: ./vcpkg
-        key: ${{ runner.os }}-${{ env.BUILD_TYPE }}-${{ hashFiles('**/CMakeLists.txt') }}-${{ hashFiles('./vcpkg.json')}}
+    # - name: Save vcpkg Cache
+    #   uses: actions/cache@v3
+    #   with:
+    #     path: ./vcpkg
+    #     key: ${{ runner.os }}-${{ env.BUILD_TYPE }}-${{ hashFiles('**/CMakeLists.txt') }}-${{ hashFiles('./vcpkg.json')}}
 
 
     - name: Configure CMake
@@ -76,13 +92,13 @@ jobs:
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
 
-    - name: List files
-      run: |
-        tree -a -d ${{github.workspace}}
-      working-directory: ${{github.workspace}}
+    # - name: List files
+    #   run: |
+    #     tree -a -d ${{github.workspace}}
+    #   working-directory: ${{github.workspace}}
     
     - name: artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ runner.os }}-${{ matrix.architecture }}-${{ env.BUILD_TYPE }}
         path: ${{github.workspace}}/build/bin/*

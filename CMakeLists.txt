@@ -17,6 +17,7 @@ find_package(OpenSSL REQUIRED)
 find_package(CURL CONFIG REQUIRED)
 find_package(Poco REQUIRED COMPONENTS Net )
 find_package(Poco REQUIRED COMPONENTS Util Foundation JSON)
+find_package(unofficial-sqlite3 CONFIG REQUIRED)
 
 
 target_include_directories(${PROJECT_NAME}
@@ -34,4 +35,5 @@ Poco::Net
 Poco::Util
 Poco::Foundation
 Poco::JSON
+unofficial::sqlite3::sqlite3
 )

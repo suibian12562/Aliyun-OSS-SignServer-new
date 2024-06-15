@@ -1,6 +1,6 @@
 # Aliyun-OSS-GeneratePresignedUrl-new
-[![.github/workflows/cmake-linux.yml](https://github.com/suibian12562/Aliyun-OSS-SignServer-new/actions/workflows/cmake-linux.yml/badge.svg)](https://github.com/suibian12562/Aliyun-OSS-SignServer-new/actions/workflows/cmake-linux.yml)
-[![.github/workflows/cmake-windows.yml](https://github.com/suibian12562/Aliyun-OSS-SignServer-new/actions/workflows/cmake-windows.yml/badge.svg)](https://github.com/suibian12562/Aliyun-OSS-SignServer-new/actions/workflows/cmake-windows.yml)  
+[![.github/workflows/cmake-linux.yml](https://github.com/suibian12562/Aliyun-OSS-SignServer-new/actions/workflows/cmake-linux.yml/badge.svg?branch=dev)](https://github.com/suibian12562/Aliyun-OSS-SignServer-new/actions/workflows/cmake-linux.yml)
+[![.github/workflows/cmake-windows.yml](https://github.com/suibian12562/Aliyun-OSS-SignServer-new/actions/workflows/cmake-windows.yml/badge.svg?branch=dev)](https://github.com/suibian12562/Aliyun-OSS-SignServer-new/actions/workflows/cmake-windows.yml)  
 http API,传入要访问的私有bucket中的文件生成签名URL并返回签名URL.计划包含客户端验证.
 
 **`正在重构,程序不可用`**
@@ -18,7 +18,7 @@ cmake --build build
 ```
 ***
 **TODO**  
-- [x] 签名有效时间  
+- [ ] 签名有效时间  
 - [ ] 人机验证  
 - [ ] Bucket权限管理  
 ***
