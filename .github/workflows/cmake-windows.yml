@@ -29,7 +29,10 @@ jobs:
     runs-on: ${{ matrix.platform }}
   
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
 
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@v7
@@ -39,8 +42,8 @@ jobs:
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');         
 
   
-      - name: Get git submodules
-        run: git submodule update --init --recursive
+      # - name: Get git submodules
+      #   run: git submodule update --init --recursive
   
       - name: Set architecture
         run: echo "ARCHITECTURE=${{ matrix.architecture }}" >> $GITHUB_ENV
