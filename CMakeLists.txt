@@ -1,10 +1,11 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.25)
 
 project(Aliyun-OSS-SignServer-new
     LANGUAGES CXX
     DESCRIPTION "A Aliyun OSS sign server by cpp"
-    VERSION 0.0.1
+    # VERSION 0.0.1
 )
+
 set(CMAKE_CXX_STANDARD 11)
 set(EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
