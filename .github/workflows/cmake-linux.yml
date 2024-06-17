@@ -50,12 +50,12 @@ jobs:
         sudo apt-get update 
         sudo apt-get install libcurl4-openssl-dev libssl-dev ninja-build -y
   
-    - name: Install vcpkg
-      run: |
-        git clone https://github.com/Microsoft/vcpkg.git
-        cd vcpkg
-        ./bootstrap-vcpkg.sh
-        ./vcpkg integrate install
+    # - name: Install vcpkg
+    #   run: |
+    #     git clone https://github.com/Microsoft/vcpkg.git
+    #     cd vcpkg
+    #     ./bootstrap-vcpkg.sh
+    #     ./vcpkg integrate install
 
     # - name: Cache
     #   uses: actions/cache@v3
@@ -83,7 +83,7 @@ jobs:
     - name: Configure CMake
       run: |
         mkdir build
-        cmake -S . -B  ./build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE=${{github.workspace}}/vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_PREFIX_PATH=${{github.workspace}}/vcpkg/installed/${{ matrix.architecture }}-linux -GNinja
+        cmake -S . -B  ./build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -GNinja
       working-directory: ${{github.workspace}}
 
 
