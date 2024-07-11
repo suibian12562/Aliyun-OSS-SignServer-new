@@ -96,6 +96,30 @@ public:
         sqlite3_close(db);
     }
 
+    int deleteFromCache(const std::string &getObjectUrlName)
+    {
+        std::string sql = "DELETE FROM Cache WHERE GetobjectUrlName = ?";
+        sqlite3_stmt *stmt;
+        int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
+        if (rc != SQLITE_OK)
+        {
+            std::cerr << "Error preparing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+            return 0;
+        }
+
+        sqlite3_bind_text(stmt, 1, getObjectUrlName.c_str(), -1, SQLITE_STATIC);
+
+        rc = sqlite3_step(stmt);
+        if (rc != SQLITE_DONE)
+        {
+            std::cerr << "Error executing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+            return 0;
+        }
+
+        sqlite3_finalize(stmt);
+        return 1;
+    }
+
     int saveToCache(const std::string &getObjectUrlName, const std::string &genedUrl, long requestTime, long cacheDuration)
     {
         long expirationTime = requestTime + cacheDuration;
@@ -159,7 +183,7 @@ public:
             requestTime = sqlite3_column_int64(stmt, 1);
             long expirationTime = sqlite3_column_int64(stmt, 2);
 
-            if (expirationTime > std::chrono::system_clock::now().time_since_epoch().count())
+            if (auto now = std::chrono::system_clock::now(); expirationTime > std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count())
             {
                 sqlite3_finalize(stmt); // 在使用完stmt后释放资源
                 return true;
@@ -167,6 +191,7 @@ public:
             else
             {
                 std::cerr << "Data expired for getObjectUrlName: " << getObjectUrlName << std::endl;
+                deleteFromCache(getObjectUrlName);
             }
         }
         else if (rc == SQLITE_DONE)

@@ -8,13 +8,9 @@ void createDefaultDatabase(const std::string &filename);
 void createDefaultConfig(const std::string &filename);
 Config readConfigFromFile(const std::string &filename);
 void genearateSignedUrl(const string &_Endpoint, const string &_Bucket, const string &_GetobjectUrlName, string &_GenedUrl);
-std::string extractTime(const std::chrono::system_clock::time_point& now);
+std::string extractTime(const std::chrono::system_clock::time_point &now);
 
-
-Config rconfig = readConfigFromFile("config.json");
-
-
-
+const Config rconfig = readConfigFromFile("config.json");
 
 class WebSocketServer : public Poco::Util::ServerApplication
 {
@@ -201,21 +197,28 @@ void RequestHandler::handleRequest(Poco::Net::HTTPServerRequest &request, Poco::
     Poco::URI uri(request.getURI());
     message_info info;
 
-    for (const auto &param : uri.getQueryParameters())
+    const auto &queryParameters = uri.getQueryParameters();
+    if (!queryParameters.empty())
     {
-        if (param.first == "Endpoint")
+        // 遍历查询参数，使用结构化绑定进行声明
+        for (const auto &[key, value] : queryParameters)
         {
-            info._Endpoint = param.second;
-        }
-        else if (param.first == "Bucket")
-        {
-            info._Bucket = param.second;
-        }
-        else if (param.first == "GetobjectUrlName")
-        {
-            info._GetobjectUrlName = param.second;
+            // 根据参数名进行赋值
+            if (key == "Endpoint")
+            {
+                info._Endpoint = value;
+            }
+            else if (key == "Bucket")
+            {
+                info._Bucket = value;
+            }
+            else if (key == "GetobjectUrlName")
+            {
+                info._GetobjectUrlName = value;
+            }
         }
     }
+
     auto now = std::chrono::system_clock::now();
     auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
     long requestTime = static_cast<long>(timestamp);
@@ -234,17 +237,17 @@ void RequestHandler::handleRequest(Poco::Net::HTTPServerRequest &request, Poco::
 
         // 保存到缓存
         info._request_time = requestTime;
-        if(cacheManager.saveToCache(info._GetobjectUrlName, info._GenedUrl, requestTime, rconfig.sign_time))
+        if (cacheManager.saveToCache(info._GetobjectUrlName, info._GenedUrl, requestTime, rconfig.sign_time))
         {
-        std::cout << "cached" << std::endl;
+            std::cout << "cached" << std::endl;
         }
-        else 
+        else
         {
-        std::cout << "datebase error" << std::endl;
-        std::clog <<"datebase error at "<<info._Bucket<<" for "<<info._GetobjectUrlName<<" and at "<<extractTime(now)<<std::endl;
+            std::cout << "datebase error" << std::endl;
+            std::clog << "datebase error at " << info._Bucket << " for " << info._GetobjectUrlName << " and at " << extractTime(now) << std::endl;
         }
-        std::cout << requestTime;
-        std::cout << info._request_time;
+        // std::cout << requestTime;
+        // std::cout << info._request_time;
     }
 
     // 将消息信息转换为JSON对象
@@ -254,17 +257,18 @@ void RequestHandler::handleRequest(Poco::Net::HTTPServerRequest &request, Poco::
     response.setStatus(Poco::Net::HTTPResponse::HTTP_OK);
     response.setContentType("application/json");
     std::ostream &ostr = response.send();
-    // jsonInfo->stringify(ostr);
+    jsonInfo->stringify(ostr);
 }
 
-std::string extractTime(const std::chrono::system_clock::time_point& now) {
+std::string extractTime(const std::chrono::system_clock::time_point &now)
+{
     std::time_t now_c = std::chrono::system_clock::to_time_t(now);
-    
-    struct std::tm * ptm = std::localtime(&now_c);
-    
+
+    struct std::tm *ptm = std::localtime(&now_c);
+
     char buffer[32];
     std::strftime(buffer, 32, "%Y/%m/%d %H:%M:%S", ptm);
-    
+
     return std::string(buffer);
 }
 
