@@ -195,7 +195,7 @@ Config readConfigFromFile(const std::string &filename)
 void RequestHandler::handleRequest(Poco::Net::HTTPServerRequest &request, Poco::Net::HTTPServerResponse &response)
 {
     Poco::URI uri(request.getURI());
-    message_info info;
+    message_info data;
 
     const auto &queryParameters = uri.getQueryParameters();
     if (!queryParameters.empty())
@@ -206,15 +206,15 @@ void RequestHandler::handleRequest(Poco::Net::HTTPServerRequest &request, Poco::
             // 根据参数名进行赋值
             if (key == "Endpoint")
             {
-                info._Endpoint = value;
+                data._Endpoint = value;
             }
             else if (key == "Bucket")
             {
-                info._Bucket = value;
+                data._Bucket = value;
             }
             else if (key == "GetobjectUrlName")
             {
-                info._GetobjectUrlName = value;
+                data._GetobjectUrlName = value;
             }
         }
     }
@@ -224,34 +224,37 @@ void RequestHandler::handleRequest(Poco::Net::HTTPServerRequest &request, Poco::
     long requestTime = static_cast<long>(timestamp);
 
     std::string cachedUrl;
-    if (cacheManager.getFromCache(info._GetobjectUrlName, cachedUrl, requestTime))
+    if (cacheManager.getFromCache(data._GetobjectUrlName, cachedUrl, requestTime))
     {
-        info._GenedUrl = cachedUrl;
-        info._request_time = requestTime;
+        data._GenedUrl = cachedUrl;
+        data._request_time = requestTime;
     }
     else
     {
+        //删除过期缓存
+        cacheManager.deleteFromCache(data._GetobjectUrlName);
+
         // 生成签名URL
-        genearateSignedUrl(info._Endpoint, info._Bucket, info._GetobjectUrlName, info._GenedUrl);
+        genearateSignedUrl(data._Endpoint, data._Bucket, data._GetobjectUrlName, data._GenedUrl);
         std::cout << "genearated" << std::endl;
 
         // 保存到缓存
-        info._request_time = requestTime;
-        if (cacheManager.saveToCache(info._GetobjectUrlName, info._GenedUrl, requestTime, rconfig.sign_time))
+        data._request_time = requestTime;
+        if (cacheManager.saveToCache(data._GetobjectUrlName, data._GenedUrl, requestTime, rconfig.sign_time))
         {
             std::cout << "cached" << std::endl;
         }
         else
         {
             std::cout << "datebase error" << std::endl;
-            std::clog << "datebase error at " << info._Bucket << " for " << info._GetobjectUrlName << " and at " << extractTime(now) << std::endl;
+            std::clog << "datebase error at " << data._Bucket << " for " << data._GetobjectUrlName << " and at " << extractTime(now) << std::endl;
         }
         // std::cout << requestTime;
         // std::cout << info._request_time;
     }
 
     // 将消息信息转换为JSON对象
-    Poco::JSON::Object::Ptr jsonInfo = info.toJSON();
+    Poco::JSON::Object::Ptr jsonInfo = data.toJSON();
 
     // 发送JSON响应
     response.setStatus(Poco::Net::HTTPResponse::HTTP_OK);

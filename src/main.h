@@ -191,7 +191,6 @@ public:
             else
             {
                 std::cerr << "Data expired for getObjectUrlName: " << getObjectUrlName << std::endl;
-                deleteFromCache(getObjectUrlName);
             }
         }
         else if (rc == SQLITE_DONE)
