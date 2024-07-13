@@ -148,7 +148,7 @@ public:
         return 1;
     }
 
-    bool getFromCache(const std::string &getObjectUrlName, std::string &genedUrl, long &requestTime)
+    bool getFromCache(const std::string &getObjectUrlName, std::string &genedUrl, const long &requestTime)
     {
         if (getObjectUrlName.empty())
         {
@@ -180,10 +180,8 @@ public:
             {
                 genedUrl = std::string(reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0)));
             }
-            requestTime = sqlite3_column_int64(stmt, 1);
             long expirationTime = sqlite3_column_int64(stmt, 2);
-
-            if (auto now = std::chrono::system_clock::now(); expirationTime > std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count())
+            if (expirationTime > requestTime)
             {
                 sqlite3_finalize(stmt); // 在使用完stmt后释放资源
                 return true;
@@ -191,7 +189,13 @@ public:
             else
             {
                 std::cerr << "Data expired for getObjectUrlName: " << getObjectUrlName << std::endl;
+
+                //删除过期缓存
+                deleteFromCache(getObjectUrlName);
             }
+
+            // requestTime = sqlite3_column_int64(stmt, 1);
+
         }
         else if (rc == SQLITE_DONE)
         {

@@ -231,8 +231,6 @@ void RequestHandler::handleRequest(Poco::Net::HTTPServerRequest &request, Poco::
     }
     else
     {
-        //删除过期缓存
-        cacheManager.deleteFromCache(data._GetobjectUrlName);
 
         // 生成签名URL
         genearateSignedUrl(data._Endpoint, data._Bucket, data._GetobjectUrlName, data._GenedUrl);
