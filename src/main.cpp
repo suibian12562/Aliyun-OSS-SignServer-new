@@ -11,17 +11,12 @@ void genearateSignedUrl(const string &_Endpoint, const string &_Bucket, const st
 std::string extractTime(const std::chrono::system_clock::time_point &now);
 
 const Config rconfig = readConfigFromFile("config.json");
+const AlibabaCloud::OSS::ClientConfiguration conf;
 
-class WebSocketServer : public Poco::Util::ServerApplication
+
+class MyHttpServer : public Poco::Util::ServerApplication
 {
 public:
-    WebSocketServer()
-    {
-    }
-
-    ~WebSocketServer()
-    {
-    }
 
 protected:
     /// 再启动的时候先调用
@@ -46,6 +41,15 @@ protected:
                 .required(false)
                 .repeatable(false));
     }
+    void displayHelp()
+    {
+        HelpFormatter helpFormatter(options());
+        helpFormatter.setCommand(commandName());
+        helpFormatter.setUsage("OPTIONS");
+        helpFormatter.setHeader("A sample HTTP server supporting the WebSocket protocol.");
+        helpFormatter.format(std::cout);
+    }
+
 
     int main(const std::vector<std::string> &args)
     {
@@ -60,6 +64,7 @@ protected:
         std::cout << "sign_time: " << rconfig.sign_time << std::endl;
 
         AlibabaCloud::OSS::InitializeSdk();
+
         // 从配置文件中获取端口
         unsigned short port = (unsigned short)rconfig.port;
 
@@ -84,7 +89,7 @@ private:
 };
 
 // 启动web 服务器
-POCO_SERVER_MAIN(WebSocketServer)
+POCO_SERVER_MAIN(MyHttpServer)
 
 void createDefaultDatabase(const std::string &filename)
 {
@@ -221,7 +226,7 @@ void RequestHandler::handleRequest(Poco::Net::HTTPServerRequest &request, Poco::
 
     auto now = std::chrono::system_clock::now();
     auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
-    long requestTime = static_cast<long>(timestamp);
+    int requestTime = static_cast<int>(timestamp);
 
     std::string cachedUrl;
     if (cacheManager.getFromCache(data._GetobjectUrlName, cachedUrl, requestTime))
@@ -260,6 +265,7 @@ void RequestHandler::handleRequest(Poco::Net::HTTPServerRequest &request, Poco::
     std::ostream &ostr = response.send();
     jsonInfo->stringify(ostr);
 }
+//sk-84781fd0a0e042f599b59de1d0b8c554
 
 std::string extractTime(const std::chrono::system_clock::time_point &now)
 {
@@ -277,20 +283,18 @@ void genearateSignedUrl(const string &_Endpoint, const string &_Bucket, const st
 {
     try
     {
-        AlibabaCloud::OSS::ClientConfiguration conf;
         AlibabaCloud::OSS::OssClient client(_Endpoint, rconfig.AccessKeyId, rconfig.AccessKeySecret, conf);
-
         auto genOutcome = client.GeneratePresignedUrl(_Bucket, _GetobjectUrlName, rconfig.sign_time, AlibabaCloud::OSS::Http::Get);
         if (genOutcome.isSuccess())
         {
-            std::cout << "GeneratePresignedUrl success, Gen url: " << genOutcome.result().c_str() << std::endl;
+            // std::cout << "GeneratePresignedUrl success, Gen url: " << genOutcome.result().c_str() << std::endl;
             _GenedUrl = genOutcome.result().c_str();
         }
         else
         {
-            std::cout << "GeneratePresignedUrl fail, code: " << genOutcome.error().Code()
-                      << ", message: " << genOutcome.error().Message()
-                      << ", requestId: " << genOutcome.error().RequestId() << std::endl;
+            std::clog << "GeneratePresignedUrl fail, code: " << genOutcome.error().Code()
+                        << ", message: " << genOutcome.error().Message()
+                        << ", requestId: " << genOutcome.error().RequestId() << std::endl;
         }
     }
     catch (const Poco::Exception &e)

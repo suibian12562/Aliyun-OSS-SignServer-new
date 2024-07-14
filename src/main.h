@@ -1,40 +1,23 @@
-﻿#include "Poco/Net/HTTPRequestHandler.h"
-#include "Poco/Net/HTTPServer.h"
-#include "Poco/Net/TCPServer.h"
-#include "Poco/Net/TCPServerConnectionFactory.h"
-#include "Poco/Net/ServerSocket.h"
-#include "Poco/Net/StreamSocket.h"
-#include "Poco/Net/SocketStream.h"
-#include "Poco/Net/SocketAddress.h"
-#include "Poco/Net/SocketAddress.h"
-#include "Poco/Net/HTTPRequest.h"
-#include "Poco/Net/HTTPResponse.h"
-#include "Poco/Net/HTTPServerRequest.h"
-#include "Poco/Net/HTTPServerResponse.h"
-#include "Poco/URI.h"
-#include "Poco/StreamCopier.h"
-#include "Poco/Util/ServerApplication.h"
-#include "Poco/FileStream.h"
-#include "Poco/Exception.h"
+﻿#include "Poco/URI.h"
+#include "Poco/FileStream.h" 
 #include "Poco/Net/HTTPServer.h"                //继承自TCPServer 实现了一个完整的HTTP多线程服务器
 #include "Poco/Net/HTTPRequestHandler.h"        //抽象基类类 被HttpServer所创建 用来处理Http的请求
 #include "Poco/Net/HTTPRequestHandlerFactory.h" //HTTPRequestHandler的工厂 给予工厂设计模式
 #include "Poco/Net/HTTPServerParams.h"          //被用来指定httpserver以及HTTPRequestHandler的参数
 #include "Poco/Net/HTTPServerRequest.h"         //ServerRequest的抽象子类用来指定 服务器端的 http请求
 #include "Poco/Net/HTTPServerResponse.h"        //ServerResponse的抽象子类用来指定服务器端的http响应
-#include "Poco/Net/NetException.h"              //网络异常
 #include "Poco/Util/ServerApplication.h"        //Application的子类 所有服务器程序 包括 Reactor FTP HTTP等都用到 算是服务器的启动类
+#include "Poco/Net/HTTPRequestHandler.h"        //抽象基类类 被HttpServer所创建 用来处理Http的请求
 #include "Poco/Util/Option.h"                   //存储了命令行选项
 #include "Poco/Util/OptionSet.h"                //一个Opention对象的集合
 #include "Poco/Util/HelpFormatter.h"            //从OptionSet格式化帮助信息
-#include "Poco/Format.h"                        //格式化函数的实现类似于 C的 sprintf函数 具体看文档
-#include "Poco/Net/ServerSocket.h"              //提供了一个TCP服务器套接字接口
-#include "Poco/Net/WebSocket.h"                 //这个类实现了RFC 6455 web套接字接口  专门针对web服务器用
 #include "Poco/JSON/JSON.h"
 #include "Poco/JSON/Parser.h"
 #include "Poco/JSON/Object.h"
 #include "Poco/JSON/Stringifier.h"
-#include "Poco/Dynamic/Var.h"
+#include "Poco/Semaphore.h"
+#include "Poco/Thread.h"
+
 
 #include <sqlite3.h>
 
@@ -43,6 +26,9 @@
 #include <fstream>
 #include <iostream>
 #include <cstdlib>
+
+Poco::Semaphore semaphore_db(1); 
+
 
 struct message_info
 {
@@ -79,7 +65,8 @@ private:
 
 public:
     SQLiteCacheManager()
-    {
+    {   
+        semaphore_db.wait();
         int rc = sqlite3_open("cache.db", &db);
         if (rc)
         {
@@ -89,21 +76,28 @@ public:
         {
             std::cout << "Opened SQLite database successfully" << std::endl;
         }
+        semaphore_db.set();
     }
 
     ~SQLiteCacheManager()
     {
+        semaphore_db.wait();
         sqlite3_close(db);
+        semaphore_db.set();
     }
 
     int deleteFromCache(const std::string &getObjectUrlName)
     {
         std::string sql = "DELETE FROM Cache WHERE GetobjectUrlName = ?";
         sqlite3_stmt *stmt;
+
+        semaphore_db.wait();
+
         int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
         if (rc != SQLITE_OK)
         {
             std::cerr << "Error preparing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+            semaphore_db.set();
             return 0;
         }
 
@@ -113,10 +107,12 @@ public:
         if (rc != SQLITE_DONE)
         {
             std::cerr << "Error executing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+            semaphore_db.set();
             return 0;
         }
 
         sqlite3_finalize(stmt);
+        semaphore_db.set();
         return 1;
     }
 
@@ -125,10 +121,14 @@ public:
         long expirationTime = requestTime + cacheDuration;
         std::string sql = "INSERT OR REPLACE INTO Cache (GetobjectUrlName, GenedUrl, RequestTime, ExpirationTime) VALUES (?, ?, ?, ?)";
         sqlite3_stmt *stmt;
+
+        semaphore_db.wait();
+
         int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
         if (rc != SQLITE_OK)
         {
             std::cerr << "Error preparing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+            semaphore_db.set();
             return 0;
         }
 
@@ -141,10 +141,12 @@ public:
         if (rc != SQLITE_DONE)
         {
             std::cerr << "Error executing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+            semaphore_db.set();
             return 0;
         }
 
         sqlite3_finalize(stmt);
+        semaphore_db.set();
         return 1;
     }
 
@@ -158,10 +160,14 @@ public:
 
         std::string sql = "SELECT GenedUrl, RequestTime, ExpirationTime FROM Cache WHERE GetobjectUrlName = ?";
         sqlite3_stmt *stmt = nullptr; // 初始化为nullptr
+
+        semaphore_db.wait();
+
         int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
         if (rc != SQLITE_OK)
         {
             std::cerr << "Error preparing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+            semaphore_db.set();
             return false;
         }
 
@@ -170,6 +176,7 @@ public:
         {
             std::cerr << "Error binding parameter: " << sqlite3_errmsg(db) << std::endl;
             sqlite3_finalize(stmt);
+            semaphore_db.set();
             return false;
         }
 
@@ -184,14 +191,18 @@ public:
             if (expirationTime > requestTime)
             {
                 sqlite3_finalize(stmt); // 在使用完stmt后释放资源
+                semaphore_db.set();
                 return true;
             }
             else
             {
-                std::cerr << "Data expired for getObjectUrlName: " << getObjectUrlName << std::endl;
-
+                std::clog << "Data expired for getObjectUrlName: " << getObjectUrlName << std::endl;
+                sqlite3_finalize(stmt);
+                semaphore_db.set();
                 //删除过期缓存
                 deleteFromCache(getObjectUrlName);
+
+                return false;
             }
 
             // requestTime = sqlite3_column_int64(stmt, 1);
@@ -199,7 +210,7 @@ public:
         }
         else if (rc == SQLITE_DONE)
         {
-            std::cerr << "No data found for getObjectUrlName: " << getObjectUrlName << std::endl;
+            // std::cerr << "No data found for getObjectUrlName: " << getObjectUrlName << std::endl;
         }
         else
         {
@@ -207,6 +218,7 @@ public:
         }
 
         sqlite3_finalize(stmt); // 在所有返回路径上都确保释放stmt资源
+        semaphore_db.set();
         return false;
     }
 };
@@ -215,6 +227,7 @@ class RequestHandler : public Poco::Net::HTTPRequestHandler
 {
 private:
     SQLiteCacheManager cacheManager;
+
 
 public:
     void handleRequest(Poco::Net::HTTPServerRequest &request, Poco::Net::HTTPServerResponse &response);
