@@ -3,6 +3,7 @@
 
 #include "main.h"
 #include "RequestHandlerFactory.h"
+#include "logger.h"
 
 using Poco::Util::Option;
 using Poco::Util::OptionSet;
@@ -57,7 +58,7 @@ protected:
     int main(const std::vector<std::string> &args)
     {
         // rconfig = readConfigFromFile("config.json");
-
+        MyLogger::Setup_logger();
         // get parameters from configuration file
         createDefaultDatabase("cache.db");
         // std::cout << rconfig.sign_time;
@@ -68,12 +69,13 @@ protected:
 
         AlibabaCloud::OSS::InitializeSdk();
 
+
         // 从配置文件中获取端口
         unsigned short port = (unsigned short)rconfig.port;
 
         HTTPServerParams *params = new HTTPServerParams;
         params->setMaxQueued(100);
-        params->setMaxThreads(4);
+        params->setMaxThreads(8);
         // 安装一个ServerSocket
         ServerSocket svs(port);
         // 安装一个HttpServer实例  并且传递 请求处理器工厂  和一个HttpServerParams对象

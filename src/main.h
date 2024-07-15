@@ -29,7 +29,7 @@
 #include <fstream>
 #include <iostream>
 
-
+using std::string;
 
 struct message_info
 {
@@ -59,6 +59,11 @@ struct Config
     int port;
 };
 
+void createDefaultDatabase(const std::string &filename);
+void createDefaultConfig(const std::string &filename);
+Config readConfigFromFile(const std::string &filename);
+void genearateSignedUrl(const string &_Endpoint, const string &_Bucket, const string &_GetobjectUrlName, string &_GenedUrl);
+std::string extractTime(const std::chrono::system_clock::time_point &now);
 
 
 #endif

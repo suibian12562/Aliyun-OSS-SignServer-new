@@ -1,16 +1,13 @@
 ﻿#include "main.h"
 #include "MyHttpServer.h"
 #include "SQLiteCacheManager.h"
+#include "logger.h"
 
 using namespace Poco::Net;
 using namespace Poco::Util;
+using Poco::Logger;
 using namespace std;
 
-void createDefaultDatabase(const std::string &filename);
-void createDefaultConfig(const std::string &filename);
-Config readConfigFromFile(const std::string &filename);
-void genearateSignedUrl(const string &_Endpoint, const string &_Bucket, const string &_GetobjectUrlName, string &_GenedUrl);
-std::string extractTime(const std::chrono::system_clock::time_point &now);
 
 
 
@@ -29,14 +26,17 @@ void createDefaultDatabase(const std::string &filename)
     int result = remove(filename.c_str());
     if (result == 0)
     {
-        std::cout << "Deleted existing database" << std::endl;
+        // std::cout << "Deleted existing database" << std::endl;
+        poco_information(logger_handle, "Deleted existing database");
     }
     else
     {
         std::cerr << "No existing database to delete" << std::endl;
+        poco_error(logger_handle, "No existing database to delete");
     }
 
     std::cout << "Creating database..." << std::endl;
+    poco_information(logger_handle, "Creating database");
     sqlite3 *db;
     char *errMsg = 0;
 
@@ -44,6 +44,7 @@ void createDefaultDatabase(const std::string &filename)
     if (rc)
     {
         std::cerr << "Error opening SQLite database: " << sqlite3_errmsg(db) << std::endl;
+        poco_error(logger_handle, "Error opening SQLite database");
     }
 
     const char *createTableSQL = "CREATE TABLE IF NOT EXISTS Cache ("
@@ -57,11 +58,13 @@ void createDefaultDatabase(const std::string &filename)
     if (rc != SQLITE_OK)
     {
         std::cerr << "Error creating table: " << errMsg << std::endl;
+        poco_error(logger_handle, "Error creating table");
         sqlite3_free(errMsg);
     }
     else
     {
         std::cout << "Table created successfully" << std::endl;
+        poco_information(logger_handle, "Table created successfully");
     }
 
     // Close database connection
@@ -89,11 +92,13 @@ void createDefaultConfig(const std::string &filename)
         Poco::FileOutputStream fileStream(filename);
         fileStream << oss.str();
         fileStream.close();
-        std::cout << "配置文件已创建成功。" << std::endl;
+        std::cout << "config file created successfully" << std::endl;
+        poco_information(logger_handle, "config file created successfully");
     }
     catch (Poco::Exception &e)
     {
-        std::cerr << "错误: 无法创建配置文件。" << e.displayText() << std::endl;
+        std::cerr << "create config failed" << e.displayText() << std::endl;
+        poco_error(logger_handle, "create config failed");
     }
 }
 Config readConfigFromFile(const std::string &filename)
@@ -104,6 +109,7 @@ Config readConfigFromFile(const std::string &filename)
     if (!file.is_open())
     {
         std::cerr << "Config file not found. Creating a default config file. Please configure and restart the program." << std::endl;
+        poco_error(logger_handle, "Config file not found. Creating a default config file. Please configure and restart the program.");
         createDefaultConfig(filename);
         // Return the default config by reference
         exit(1);
@@ -123,83 +129,13 @@ Config readConfigFromFile(const std::string &filename)
     catch (const Poco::Exception &e)
     {
         std::cerr << "Error: Unable to parse config JSON: " << e.displayText() << std::endl;
+        poco_error(logger_handle, "Error: Unable to parse config JSON");
     }
 
     file.close();
     // Return the loaded config
     return _config;
 }
-
-void RequestHandler::handleRequest(Poco::Net::HTTPServerRequest &request, Poco::Net::HTTPServerResponse &response)
-{
-    Poco::URI uri(request.getURI());
-    message_info data;
-
-    const auto &queryParameters = uri.getQueryParameters();
-    if (!queryParameters.empty())
-    {
-        // 遍历查询参数，使用结构化绑定进行声明
-        for (const auto &[key, value] : queryParameters)
-        {
-            // 根据参数名进行赋值
-            if (key == "Endpoint")
-            {
-                data._Endpoint = value;
-            }
-            else if (key == "Bucket")
-            {
-                data._Bucket = value;
-            }
-            else if (key == "GetobjectUrlName")
-            {
-                data._GetobjectUrlName = value;
-            }
-        }
-    }
-
-    auto now = std::chrono::system_clock::now();
-    auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
-    int requestTime = static_cast<int>(timestamp);
-
-    std::string cachedUrl;
-    if (cacheManager.getFromCache(data._GetobjectUrlName, cachedUrl, requestTime))
-    {
-        data._GenedUrl = cachedUrl;
-        data._request_time = requestTime;
-    }
-    else
-    {
-
-        // 生成签名URL
-        genearateSignedUrl(data._Endpoint, data._Bucket, data._GetobjectUrlName, data._GenedUrl);
-        std::cout << "genearated" << std::endl;
-
-        // 保存到缓存
-        data._request_time = requestTime;
-        if (cacheManager.saveToCache(data._GetobjectUrlName, data._GenedUrl, requestTime, rconfig.sign_time))
-        {
-            std::cout << "cached" << std::endl;
-        }
-        else
-        {
-            std::cout << "datebase error" << std::endl;
-            std::clog << "datebase error at " << data._Bucket << " for " << data._GetobjectUrlName << " and at " << extractTime(now) << std::endl;
-        }
-        // std::cout << requestTime;
-        // std::cout << info._request_time;
-    }
-
-    // 将消息信息转换为JSON对象
-    Poco::JSON::Object::Ptr jsonInfo = data.toJSON();
-
-    // 发送JSON响应
-    response.setStatus(Poco::Net::HTTPResponse::HTTP_OK);
-    response.setContentType("application/json");
-    std::ostream &ostr = response.send();
-    jsonInfo->stringify(ostr);
-}
-//sk-84781fd0a0e042f599b59de1d0b8c554
-
 std::string extractTime(const std::chrono::system_clock::time_point &now)
 {
     std::time_t now_c = std::chrono::system_clock::to_time_t(now);
@@ -211,7 +147,6 @@ std::string extractTime(const std::chrono::system_clock::time_point &now)
 
     return std::string(buffer);
 }
-
 void genearateSignedUrl(const string &_Endpoint, const string &_Bucket, const string &_GetobjectUrlName, string &_GenedUrl)
 {
     try
@@ -228,10 +163,12 @@ void genearateSignedUrl(const string &_Endpoint, const string &_Bucket, const st
             std::clog << "GeneratePresignedUrl fail, code: " << genOutcome.error().Code()
                         << ", message: " << genOutcome.error().Message()
                         << ", requestId: " << genOutcome.error().RequestId() << std::endl;
+            poco_information(logger_handle, "GeneratePresignedUrl fail, code: " + genOutcome.error().Code() + ", message: " + genOutcome.error().Message() + ", requestId: " + genOutcome.error().RequestId());
         }
     }
     catch (const Poco::Exception &e)
     {
         std::cerr << "Error generating Presigned URL: " << e.displayText() << std::endl;
+        poco_error(logger_handle, "Error generating Presigned URL: " + e.displayText());
     }
 }

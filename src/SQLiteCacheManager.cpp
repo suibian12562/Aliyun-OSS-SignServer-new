@@ -1,5 +1,6 @@
 ﻿#include "main.h"
 #include "SQLiteCacheManager.h"
+#include "logger.h"
 
 SQLiteCacheManager::SQLiteCacheManager()
 {
@@ -8,10 +9,12 @@ SQLiteCacheManager::SQLiteCacheManager()
     if (rc)
     {
         std::cerr << "Error opening SQLite database: " << sqlite3_errmsg(db) << std::endl;
+        poco_error(logger_handle, "Error opening SQLite database");
     }
     else
     {
-        std::cout << "Opened SQLite database successfully" << std::endl;
+        // std::cout << "Opened SQLite database successfully" << std::endl;
+        // poco_information(logger_handle, "Opened SQLite database successfully");
     }
     semaphore_db.set();
 }
@@ -34,6 +37,7 @@ int SQLiteCacheManager::deleteFromCache(const std::string &getObjectUrlName)
     if (rc != SQLITE_OK)
     {
         std::cerr << "Error preparing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+        poco_error(logger_handle, "Error preparing SQL statement");
         semaphore_db.set();
         return 0;
     }
@@ -44,6 +48,7 @@ int SQLiteCacheManager::deleteFromCache(const std::string &getObjectUrlName)
     if (rc != SQLITE_DONE)
     {
         std::cerr << "Error executing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+        poco_error(logger_handle, "Error executing SQL statement");
         semaphore_db.set();
         return 0;
     }
@@ -65,6 +70,7 @@ int SQLiteCacheManager::saveToCache(const std::string &getObjectUrlName, const s
     if (rc != SQLITE_OK)
     {
         std::cerr << "Error preparing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+        poco_error(logger_handle, "Error preparing SQL statement");
         semaphore_db.set();
         return 0;
     }
@@ -78,6 +84,7 @@ int SQLiteCacheManager::saveToCache(const std::string &getObjectUrlName, const s
     if (rc != SQLITE_DONE)
     {
         std::cerr << "Error executing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+        poco_error(logger_handle, "Error executing SQL statement");
         semaphore_db.set();
         return 0;
     }
@@ -92,6 +99,7 @@ bool SQLiteCacheManager::getFromCache(const std::string &getObjectUrlName, std::
     if (getObjectUrlName.empty())
     {
         std::cerr << "getObjectUrlName is empty." << std::endl;
+        poco_error(logger_handle, "getObjectUrlName is empty");
         return false;
     }
 
@@ -104,6 +112,7 @@ bool SQLiteCacheManager::getFromCache(const std::string &getObjectUrlName, std::
     if (rc != SQLITE_OK)
     {
         std::cerr << "Error preparing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+        poco_error(logger_handle, "Error preparing SQL statement");
         semaphore_db.set();
         return false;
     }
@@ -112,6 +121,7 @@ bool SQLiteCacheManager::getFromCache(const std::string &getObjectUrlName, std::
     if (rc != SQLITE_OK)
     {
         std::cerr << "Error binding parameter: " << sqlite3_errmsg(db) << std::endl;
+        poco_error(logger_handle, "Error binding parameter");
         sqlite3_finalize(stmt);
         semaphore_db.set();
         return false;
@@ -134,6 +144,7 @@ bool SQLiteCacheManager::getFromCache(const std::string &getObjectUrlName, std::
         else
         {
             std::clog << "Data expired for getObjectUrlName: " << getObjectUrlName << std::endl;
+            poco_information(logger_handle, "Data expired for getObjectUrlName: " + getObjectUrlName);
             sqlite3_finalize(stmt);
             semaphore_db.set();
             // 删除过期缓存
@@ -151,6 +162,7 @@ bool SQLiteCacheManager::getFromCache(const std::string &getObjectUrlName, std::
     else
     {
         std::cerr << "Error executing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+        poco_error(logger_handle, "Error executing SQL statement");
     }
 
     sqlite3_finalize(stmt); // 在所有返回路径上都确保释放stmt资源
