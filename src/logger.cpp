@@ -19,7 +19,6 @@ namespace MyLogger
         file_channel->setProperty("path", "log.log");
         AutoPtr<PatternFormatter> pattern_formatter(new PatternFormatter("%L%H:%M:%S-code line :%u-%U : %t"));
         AutoPtr<FormattingChannel> formatter_channle(new FormattingChannel(pattern_formatter, file_channel));
-        AutoPtr<ConsoleChannel> console_channel(new ConsoleChannel);
         Logger::root().setChannel(formatter_channle);
         ///- finish logger initiation
     }
