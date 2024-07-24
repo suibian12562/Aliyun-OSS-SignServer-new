@@ -26,7 +26,7 @@ project(Aliyun-OSS-SignServer-new
 file(GLOB ALL_SOURCE "${CMAKE_SOURCE_DIR}/src/*.cpp" )
 
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 add_executable(${PROJECT_NAME} ${ALL_SOURCE})
@@ -35,8 +35,7 @@ add_subdirectory(third_party)
 
 find_package(OpenSSL REQUIRED)
 find_package(CURL CONFIG REQUIRED)
-find_package(Poco REQUIRED COMPONENTS Net Util Foundation JSON)
-find_package(unofficial-sqlite3 CONFIG REQUIRED)
+find_package(Poco REQUIRED COMPONENTS Net Util Foundation JSON Data DataSQLite)
 
 
 target_include_directories(${PROJECT_NAME}
@@ -52,5 +51,6 @@ Poco::Net
 Poco::Util
 Poco::Foundation
 Poco::JSON
-unofficial::sqlite3::sqlite3
+Poco::Data
+Poco::DataSQLite
 )

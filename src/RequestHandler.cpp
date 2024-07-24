@@ -30,37 +30,32 @@ void RequestHandler::handleRequest(Poco::Net::HTTPServerRequest &request, Poco::
             }
         }
     }
-
-    auto now = std::chrono::system_clock::now();
-    auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
-    int requestTime = static_cast<int>(timestamp);
-
+    Poco::Timestamp now; // 当前日期和时间
+    unsigned int timeNow = now.epochTime();
     std::string cachedUrl;
-    if (cacheManager.getFromCache(data._GetobjectUrlName, cachedUrl, requestTime))
+
+    if (cacheManager.getFromCache(data._GetobjectUrlName, cachedUrl, timeNow))
     {
         data._GenedUrl = cachedUrl;
-        data._request_time = requestTime;
+        data._request_time = timeNow;
     }
     else
     {
 
         // 生成签名URL
         genearateSignedUrl(data._Endpoint, data._Bucket, data._GetobjectUrlName, data._GenedUrl);
-        // std::cout << "genearated" << std::endl;
 
         // 保存到缓存
-        data._request_time = requestTime;
-        if (cacheManager.saveToCache(data._GetobjectUrlName, data._GenedUrl, requestTime, rconfig.sign_time))
+        data._request_time = timeNow;
+
+        if (cacheManager.saveToCache(data._GetobjectUrlName, data._GenedUrl,data._request_time))
         {
-            // std::cout << "cached" << std::endl;
         }
         else
         {
-            std::clog << "datebase error at " << data._Bucket << " for " << data._GetobjectUrlName << " and at " << extractTime(now) << std::endl;
-            poco_error(logger_handle, "datebase error at " + data._Bucket + " for " + data._GetobjectUrlName + " and at " + extractTime(now));
+            std::clog << "datebase error at " << data._Bucket << " for " << data._GetobjectUrlName << " and at " << now.utcTime() << std::endl;
+            poco_error(logger_handle, "datebase error at " + data._Bucket + " for " + data._GetobjectUrlName + " and at ");
         }
-        // std::cout << requestTime;
-        // std::cout << info._request_time;
     }
 
     // 将消息信息转换为JSON对象

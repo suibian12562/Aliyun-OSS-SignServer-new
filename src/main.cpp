@@ -14,55 +14,41 @@ const AlibabaCloud::OSS::ClientConfiguration conf;
 // 启动web 服务器
 POCO_SERVER_MAIN(MyHttpServer)
 
-void createDefaultDatabase(const std::string &filename)
+
+void createDefaultDatabase(const std::string& filename)
 {
-    int result = remove(filename.c_str());
-    if (result == 0)
+    Poco::Data::SQLite::Connector::registerConnector();
+    Poco::Data::Session session("SQLite", filename);
+
+    
+    if (int result = remove(filename.c_str());result == 0)
     {
-        // std::cout << "Deleted existing database" << std::endl;
         poco_information(logger_handle, "Deleted existing database");
     }
     else
     {
-        std::cerr << "No existing database to delete" << std::endl;
         poco_error(logger_handle, "No existing database to delete");
     }
 
-    std::cout << "Creating database..." << std::endl;
     poco_information(logger_handle, "Creating database");
-    sqlite3 *db;
-    char *errMsg = nullptr;
 
-    int rc = sqlite3_open(filename.c_str(), &db);
-    if (rc)
-    {
-        std::cerr << "Error opening SQLite database: " << sqlite3_errmsg(db) << std::endl;
-        poco_error(logger_handle, "Error opening SQLite database");
-    }
+    const char* createTableSQL = "CREATE TABLE IF NOT EXISTS Cache (GetobjectUrlName TEXT PRIMARY KEY, GenedUrl TEXT, RequestTime INTEGER, ExpirationTime INTEGER)";
 
-    const char *createTableSQL = "CREATE TABLE IF NOT EXISTS Cache ("
-                                 "GetobjectUrlName TEXT PRIMARY KEY,"
-                                 "GenedUrl TEXT,"
-                                 "RequestTime INTEGER,"
-                                 "ExpirationTime INTEGER"
-                                 ")";
-
-    rc = sqlite3_exec(db, createTableSQL, nullptr, nullptr, &errMsg);
-    if (rc != SQLITE_OK)
+    try
     {
-        std::cerr << "Error creating table: " << errMsg << std::endl;
-        poco_error(logger_handle, "Error creating table");
-        sqlite3_free(errMsg);
-    }
-    else
-    {
-        std::cout << "Table created successfully" << std::endl;
+        Poco::Data::Statement createTable(session);
+        createTable << createTableSQL, Poco::Data::Keywords::now;
         poco_information(logger_handle, "Table created successfully");
     }
+    catch (const Poco::Exception& ex)
+    {
+        poco_error(logger_handle, "Error creating table: " + ex.displayText());
+    }
 
-    // Close database connection
-    sqlite3_close(db);
+    Poco::Data::SQLite::Connector::unregisterConnector();
 }
+
+
 void createDefaultConfig(const std::string &filename)
 {
     Config config;

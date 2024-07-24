@@ -26,8 +26,6 @@ void MyHttpServer::initialize(Application &self)
 
     AlibabaCloud::OSS::InitializeSdk();
 
-
-
     ServerApplication::initialize(self);
 }
 
@@ -59,15 +57,22 @@ int MyHttpServer::main(const std::vector<std::string> &args)
     HTTPServerParams *params = new HTTPServerParams;
     params->setMaxQueued(100);
     params->setMaxThreads(8);
-    // 安装一个ServerSocket
-    ServerSocket svs(rconfig.port);
-    // 安装一个HttpServer实例  并且传递 请求处理器工厂  和一个HttpServerParams对象
-    HTTPServer srv(new RequestHandlerFactory, svs, params);
+    try
+    {
+        ServerSocket svs(rconfig.port);
 
-    srv.start();
-    // 等待kill 或者控制台CTRL+C
-    waitForTerminationRequest();
-    // 停止HTTP服务器
-    srv.stop();
+        //安装一个HttpServer实例  并且传递 请求处理器工厂  和一个HttpServerParams对象
+        HTTPServer srv(new RequestHandlerFactory, svs, params);
+
+        srv.start();
+
+        waitForTerminationRequest();
+        // 停止HTTP服务器
+        srv.stop();
+    }
+    catch(Poco::Exception &ex)
+    {
+        std::cout << ex.displayText() << std::endl;
+    }
     return Application::EXIT_OK; // 返回正常退出状态
 }

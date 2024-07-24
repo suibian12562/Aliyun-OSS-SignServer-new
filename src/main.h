@@ -21,8 +21,15 @@
 #include "Poco/Semaphore.h"
 #include "Poco/Thread.h"
 
+#include "Poco/Timestamp.h"
 
-#include <sqlite3.h>
+
+#include "Poco/Data/Session.h"
+#include "Poco/Data/Statement.h"
+#include "Poco/Data/SQLite/Connector.h"
+
+
+
 
 #include "alibabacloud/oss/OssClient.h" // 阿里云 OSS C++ SDK 头文件
 
@@ -30,6 +37,8 @@
 #include <iostream>
 #include <iomanip>
 #include <time.h>
+#include <memory>
+
 
 
 
@@ -42,7 +51,7 @@ struct message_info
     std::string _Bucket;
     std::string _GetobjectUrlName;
     std::string _GenedUrl;
-    long _request_time;
+    unsigned int _request_time;
 
     Poco::JSON::Object::Ptr toJSON() const
     {

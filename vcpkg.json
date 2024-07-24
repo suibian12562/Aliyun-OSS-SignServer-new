@@ -9,10 +9,9 @@
         "name": "curl"
       },
       {
-        "name":"poco"
-      },
-      {
-        "name":"sqlite3"
+        "name":"poco",
+        "features": ["sqlite3"]
+
       }
     ]
   }

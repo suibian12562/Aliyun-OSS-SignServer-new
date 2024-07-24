@@ -2,107 +2,68 @@
 #include "SQLiteCacheManager.h"
 #include "logger.h"
 
-static Poco::Semaphore semaphore_db(1);
-SQLiteCacheManager::SQLiteCacheManager()
+extern const Config rconfig;
+
+
+SQLiteCacheManager::SQLiteCacheManager(const std::string &dbPath) : _dbPath(dbPath)
 {
-    semaphore_db.wait();
-    int rc = sqlite3_open("cache.db", &db);
-    if (rc)
-    {
-        std::cerr << "Error opening SQLite database: " << sqlite3_errmsg(db) << std::endl;
-        poco_error(logger_handle, "Error opening SQLite database");
-    }
-    else
-    {
-        // std::cout << "Opened SQLite database successfully" << std::endl;
-        // poco_information(logger_handle, "Opened SQLite database successfully");
-    }
-    semaphore_db.set();
+    Poco::Data::SQLite::Connector::registerConnector();
+    _session = std::make_shared<Poco::Data::Session>("SQLite", _dbPath);
 }
 
 SQLiteCacheManager::~SQLiteCacheManager()
 {
     try
     {
-        semaphore_db.wait();
-        sqlite3_close(db);
-        semaphore_db.set();
+        Poco::Data::SQLite::Connector::unregisterConnector();
     }
-    catch (const std::exception &e)
+    catch (Poco::Exception &e)
     {
-        std::cerr << e.what() << '\n';
+        // do nothing
     }
 }
 
 int SQLiteCacheManager::deleteFromCache(const std::string &getObjectUrlName)
 {
-    std::string sql = "DELETE FROM Cache WHERE GetobjectUrlName = ?";
-    sqlite3_stmt *stmt;
 
-    semaphore_db.wait();
+    Poco::Data::Statement deleteStmt(*_session);
+    deleteStmt << "DELETE FROM Cache WHERE GetobjectUrlName = ?", Poco::Data::Keywords::useRef(getObjectUrlName);
 
-    int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
-    if (rc != SQLITE_OK)
+    if (deleteStmt.execute() > 0) // 如果影响行数大于0，则表示删除成功
     {
-        std::cerr << "Error preparing SQL statement: " << sqlite3_errmsg(db) << std::endl;
-        poco_error(logger_handle, "Error preparing SQL statement");
-        semaphore_db.set();
-        return 0;
+        return 1;
+        std::clog << "delete successful\n";
     }
-
-    sqlite3_bind_text(stmt, 1, getObjectUrlName.c_str(), -1, SQLITE_STATIC);
-
-    rc = sqlite3_step(stmt);
-    if (rc != SQLITE_DONE)
-    {
-        std::cerr << "Error executing SQL statement: " << sqlite3_errmsg(db) << std::endl;
-        poco_error(logger_handle, "Error executing SQL statement");
-        semaphore_db.set();
-        return 0;
-    }
-
-    sqlite3_finalize(stmt);
-    semaphore_db.set();
-    return 1;
+    poco_information(logger_handle,"delete failed");
+    std::clog << "delete failed\n";
+    return 0; // 返回错误代码或其他适当值
 }
 
-int SQLiteCacheManager::saveToCache(const std::string &getObjectUrlName, const std::string &genedUrl, long requestTime, long cacheDuration)
+int SQLiteCacheManager::saveToCache(const std::string &getObjectUrlName, const std::string &genedUrl, const unsigned int &timeNow)
 {
-    long expirationTime = requestTime + cacheDuration;
-    std::string sql = "INSERT OR REPLACE INTO Cache (GetobjectUrlName, GenedUrl, RequestTime, ExpirationTime) VALUES (?, ?, ?, ?)";
-    sqlite3_stmt *stmt;
+    long expirationTime = timeNow + rconfig.sign_time;
+    Poco::Data::Statement insert(*_session);
 
-    semaphore_db.wait();
-
-    int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
-    if (rc != SQLITE_OK)
+    try
     {
-        std::cerr << "Error preparing SQL statement: " << sqlite3_errmsg(db) << std::endl;
-        poco_error(logger_handle, "Error preparing SQL statement");
-        semaphore_db.set();
-        return 0;
+        insert << "INSERT OR REPLACE INTO Cache (GetobjectUrlName, GenedUrl, RequestTime, ExpirationTime) VALUES (?, ?, ?, ?)",
+            Poco::Data::Keywords::useRef(getObjectUrlName),
+            Poco::Data::Keywords::useRef(genedUrl),
+            Poco::Data::Keywords::useRef(timeNow),
+            Poco::Data::Keywords::useRef(expirationTime);
+        insert.execute();
     }
-
-    sqlite3_bind_text(stmt, 1, getObjectUrlName.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, genedUrl.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_int64(stmt, 3, requestTime);
-    sqlite3_bind_int64(stmt, 4, expirationTime);
-
-    rc = sqlite3_step(stmt);
-    if (rc != SQLITE_DONE)
+    catch (Poco::Exception &e)
     {
-        std::cerr << "Error executing SQL statement: " << sqlite3_errmsg(db) << std::endl;
+        std::cerr << e.what() << std::endl;
         poco_error(logger_handle, "Error executing SQL statement");
-        semaphore_db.set();
         return 0;
     }
 
-    sqlite3_finalize(stmt);
-    semaphore_db.set();
     return 1;
 }
 
-bool SQLiteCacheManager::getFromCache(const std::string &getObjectUrlName, std::string &genedUrl, const long &requestTime)
+bool SQLiteCacheManager::getFromCache(const std::string &getObjectUrlName, std::string &genedUrl, unsigned int &timeNow)
 {
     if (getObjectUrlName.empty())
     {
@@ -110,70 +71,32 @@ bool SQLiteCacheManager::getFromCache(const std::string &getObjectUrlName, std::
         poco_error(logger_handle, "getObjectUrlName is empty");
         return false;
     }
+    int expirationTime = 0;
+    int waste;
+    Poco::Data::Statement select(*_session);
+    select << "SELECT GenedUrl, RequestTime, ExpirationTime FROM Cache WHERE GetobjectUrlName = ?",
+        Poco::Data::Keywords::into(genedUrl),
+        Poco::Data::Keywords::into(waste),
+        Poco::Data::Keywords::into(expirationTime),
+        Poco::Data::Keywords::useRef(getObjectUrlName);
 
-    std::string sql = "SELECT GenedUrl, RequestTime, ExpirationTime FROM Cache WHERE GetobjectUrlName = ?";
-    sqlite3_stmt *stmt = nullptr; // 初始化为nullptr
-
-    semaphore_db.wait();
-
-    int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
-    if (rc != SQLITE_OK)
-    {
-        std::cerr << "Error preparing SQL statement: " << sqlite3_errmsg(db) << std::endl;
-        poco_error(logger_handle, "Error preparing SQL statement");
-        semaphore_db.set();
-        return false;
-    }
-
-    rc = sqlite3_bind_text(stmt, 1, getObjectUrlName.c_str(), getObjectUrlName.size(), SQLITE_STATIC);
-    if (rc != SQLITE_OK)
-    {
-        std::cerr << "Error binding parameter: " << sqlite3_errmsg(db) << std::endl;
-        poco_error(logger_handle, "Error binding parameter");
-        sqlite3_finalize(stmt);
-        semaphore_db.set();
-        return false;
-    }
-
-    rc = sqlite3_step(stmt);
-    if (rc == SQLITE_ROW)
-    {
-        if (sqlite3_column_text(stmt, 0) != nullptr)
-        {
-            genedUrl = std::string(reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0)));
-        }
-        long expirationTime = sqlite3_column_int64(stmt, 2);
-        if (expirationTime > requestTime)
-        {
-            sqlite3_finalize(stmt); // 在使用完stmt后释放资源
-            semaphore_db.set();
-            return true;
-        }
-        else
-        {
-            std::clog << "Data expired for getObjectUrlName: " << getObjectUrlName << std::endl;
-            poco_information(logger_handle, "Data expired for getObjectUrlName: " + getObjectUrlName);
-            sqlite3_finalize(stmt);
-            semaphore_db.set();
-            // 删除过期缓存
-            deleteFromCache(getObjectUrlName);
-
-            return false;
-        }
-
-        // requestTime = sqlite3_column_int64(stmt, 1);
-    }
-    else if (rc == SQLITE_DONE)
+    if (select.execute() == 0)
     {
         // std::cerr << "No data found for getObjectUrlName: " << getObjectUrlName << std::endl;
+        return false;
+    }
+
+
+    if (expirationTime > timeNow)
+    {
+        return true;
     }
     else
     {
-        std::cerr << "Error executing SQL statement: " << sqlite3_errmsg(db) << std::endl;
-        poco_error(logger_handle, "Error executing SQL statement");
+        std::clog << "Data expired for getObjectUrlName: " << getObjectUrlName << std::endl;
+        poco_information(logger_handle, "Data expired for getObjectUrlName: " + getObjectUrlName);
+        // 删除过期缓存
+        deleteFromCache(getObjectUrlName);
+        return false;
     }
-
-    sqlite3_finalize(stmt); // 在所有返回路径上都确保释放stmt资源
-    semaphore_db.set();
-    return false;
 }
