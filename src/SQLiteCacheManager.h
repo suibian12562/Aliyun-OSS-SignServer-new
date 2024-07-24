@@ -3,13 +3,14 @@
 
 #include "main.h"
 
-extern Poco::Semaphore semaphore_db;
 
 
 class SQLiteCacheManager
 {
 private:
     sqlite3 *db;
+
+
 
 public:
     SQLiteCacheManager();

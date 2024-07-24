@@ -8,15 +8,8 @@ using namespace Poco::Util;
 using Poco::Logger;
 using namespace std;
 
-
-
-
 extern const Config rconfig = readConfigFromFile("config.json");
 const AlibabaCloud::OSS::ClientConfiguration conf;
-Poco::Semaphore semaphore_db(1); 
-
-
-
 
 // 启动web 服务器
 POCO_SERVER_MAIN(MyHttpServer)
@@ -38,7 +31,7 @@ void createDefaultDatabase(const std::string &filename)
     std::cout << "Creating database..." << std::endl;
     poco_information(logger_handle, "Creating database");
     sqlite3 *db;
-    char *errMsg = 0;
+    char *errMsg = nullptr;
 
     int rc = sqlite3_open(filename.c_str(), &db);
     if (rc)
@@ -140,13 +133,18 @@ std::string extractTime(const std::chrono::system_clock::time_point &now)
 {
     std::time_t now_c = std::chrono::system_clock::to_time_t(now);
 
-    struct std::tm *ptm = std::localtime(&now_c);
+    std::tm timeinfo;
+#ifdef _WIN32
+    localtime_s(&timeinfo, &now_c);
+#else
+    localtime_r(&now_c, &timeinfo);
+#endif
 
-    char buffer[32];
-    std::strftime(buffer, 32, "%Y/%m/%d %H:%M:%S", ptm);
-
-    return std::string(buffer);
+    std::ostringstream oss;
+    oss << std::put_time(&timeinfo, "%Y/%m/%d %H:%M:%S");
+    return oss.str();
 }
+
 void genearateSignedUrl(const string &_Endpoint, const string &_Bucket, const string &_GetobjectUrlName, string &_GenedUrl)
 {
     try
@@ -161,8 +159,8 @@ void genearateSignedUrl(const string &_Endpoint, const string &_Bucket, const st
         else
         {
             std::clog << "GeneratePresignedUrl fail, code: " << genOutcome.error().Code()
-                        << ", message: " << genOutcome.error().Message()
-                        << ", requestId: " << genOutcome.error().RequestId() << std::endl;
+                      << ", message: " << genOutcome.error().Message()
+                      << ", requestId: " << genOutcome.error().RequestId() << std::endl;
             poco_information(logger_handle, "GeneratePresignedUrl fail, code: " + genOutcome.error().Code() + ", message: " + genOutcome.error().Message() + ", requestId: " + genOutcome.error().RequestId());
         }
     }
