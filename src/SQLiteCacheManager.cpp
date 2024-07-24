@@ -2,7 +2,7 @@
 #include "SQLiteCacheManager.h"
 #include "logger.h"
 
-Poco::Semaphore semaphore_db(1);
+static Poco::Semaphore semaphore_db(1);
 SQLiteCacheManager::SQLiteCacheManager()
 {
     semaphore_db.wait();

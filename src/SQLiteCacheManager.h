@@ -12,7 +12,9 @@ private:
 
 
 
+
 public:
+
     SQLiteCacheManager();
 
     ~SQLiteCacheManager();
