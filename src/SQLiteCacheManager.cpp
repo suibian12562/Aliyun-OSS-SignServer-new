@@ -21,9 +21,16 @@ SQLiteCacheManager::SQLiteCacheManager()
 
 SQLiteCacheManager::~SQLiteCacheManager()
 {
-    semaphore_db.wait();
-    sqlite3_close(db);
-    semaphore_db.set();
+    try
+    {
+        semaphore_db.wait();
+        sqlite3_close(db);
+        semaphore_db.set();
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << e.what() << '\n';
+    }
 }
 
 int SQLiteCacheManager::deleteFromCache(const std::string &getObjectUrlName)
