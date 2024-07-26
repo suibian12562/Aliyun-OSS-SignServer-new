@@ -46,23 +46,17 @@ jobs:
           if [ $RUNNER_OS == 'Linux' ]; then
             sudo apt-get update 
             sudo apt-get install libcurl4-openssl-dev libssl-dev ninja-build -y
-          elif [ $RUNNER_OS == 'Windows' ]; then
-            choco install ninja 
-          elif [ $RUNNER_OS == 'macOS' ]; then
-            brew install ninja
           fi
         shell: bash
 
       - name: Configure CMake
         run: |
           mkdir -p build
-          
           if [ $RUNNER_OS == 'Windows' ]; then
             cmake -S . -B ./build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE="$Env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
           fi
           cmake -S . -B ./build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -GNinja
         working-directory: ${{github.workspace}}
-        shell: bash
 
       - name: Build
         run: cmake --build ./build --config ${{env.BUILD_TYPE}}
