@@ -25,10 +25,10 @@ RUN mkdir -p /app && \
     unzip ${RELEASE_NAME} -d /app
 
 # 复制启动脚本到容器中
-COPY start.sh /app/start.sh
+COPY run.sh /app/run.sh
 
 # 赋予启动脚本执行权限
-RUN chmod +x /app/start.sh
+RUN chmod +x /app/run.sh
 
 # 切换到非root用户
 USER appuser
