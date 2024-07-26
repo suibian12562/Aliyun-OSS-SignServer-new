@@ -53,10 +53,11 @@ jobs:
         run: |
           mkdir -p build
           if [ $RUNNER_OS == 'Windows' ]; then
-            cmake -S . -B ./build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE="$Env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+            cmake -S . -B ./build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
           fi
           cmake -S . -B ./build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -GNinja
         working-directory: ${{github.workspace}}
+        shell: bash
 
       - name: Build
         run: cmake --build ./build --config ${{env.BUILD_TYPE}}
