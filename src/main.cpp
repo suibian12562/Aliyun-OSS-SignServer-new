@@ -55,7 +55,7 @@ void createDefaultConfig(const std::string &filename)
     config.AccessKeyId = "your_access_key";
     config.AccessKeySecret = "your_access_secret";
     config.sign_time = 40;
-    config.port = 1145;
+    config.port = 8080;
 
     Poco::JSON::Object::Ptr jsonObj = new Poco::JSON::Object;
     jsonObj->set("AccessKeyId", config.AccessKeyId);
