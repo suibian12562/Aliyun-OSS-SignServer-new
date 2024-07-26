@@ -1,16 +1,13 @@
 # Aliyun-OSS-GeneratePresignedUrl-new
 [![.github/workflows/build on dev.yml](https://github.com/suibian12562/Aliyun-OSS-SignServer-new/actions/workflows/build%20on%20dev.yml/badge.svg)](https://github.com/suibian12562/Aliyun-OSS-SignServer-new/actions/workflows/build%20on%20dev.yml)
-阿里云OSS签名工具(外链工具),纯cpp实现,高性能http服务器,跨平台  
-
-
-
-
-**编译**  
-使用[microsoft/_vcpkg_](https://github.com/microsoft/vcpkg)管理包,为此编译前你需使用此命令安装依赖
+阿里云OSS签名工具(外链工具),纯cpp实现,高性能http服务器,跨平台
+***
+**编译**<br>
+使用[microsoft/_vcpkg_](https://github.com/microsoft/vcpkg)管理包,为此编译前你需使用此命令安装依赖<br>
 ```BASH
 vcpkg install
 ```
-Linux下需先安装依赖 libcurl4-openssl-dev libssl-dev
+Linux下需安装依赖:libcurl4-openssl-dev libssl-dev
 ```BASH
 sudo apt-get install libcurl4-openssl-dev libssl-dev
 ```
