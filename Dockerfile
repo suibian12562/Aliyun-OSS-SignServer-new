@@ -8,7 +8,7 @@ RUN apk add --no-cache curl unzip
 RUN adduser -D -u 1000 appuser
 
 # 设置环境变量
-ENV GITHUB_REPO="https://github.com/suibian12562/Aliyun-OSS-SignServer-new"
+ENV GITHUB_REPO="suibian12562/Aliyun-OSS-SignServer-new"
 ENV ARCH="Linux-x64"
 ENV RELEASE_NAME="${ARCH}-Release.zip"
 ENV PORT=8080
