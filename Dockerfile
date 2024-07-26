@@ -4,8 +4,11 @@ FROM alpine:latest
 # 安装必要的工具
 RUN apk add --no-cache curl unzip
 
+# 创建一个非root用户
+RUN adduser -D -u 1000 appuser
+
 # 设置环境变量
-ENV GITHUB_REPO="YOUR_GITHUB_REPO"
+ENV GITHUB_REPO="https://github.com/suibian12562/Aliyun-OSS-SignServer-new"
 ENV ARCH="Linux-x64"
 ENV RELEASE_NAME="${ARCH}-Release.zip"
 ENV PORT=8080
@@ -23,7 +26,12 @@ RUN mkdir -p /app && \
 
 # 复制启动脚本到容器中
 COPY start.sh /app/start.sh
+
+# 赋予启动脚本执行权限
 RUN chmod +x /app/start.sh
+
+# 切换到非root用户
+USER appuser
 
 # 进入解压后的目录
 WORKDIR /app
