@@ -1,0 +1,75 @@
+on:
+  push:
+    branches: 
+      - action-test
+      - dev
+  pull_request:
+    branches: 
+      - dev
+
+env:
+  BUILD_TYPE: Release
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        platform:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+        architecture:
+          - x64
+          - arm64
+          - x86
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+  
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Set architecture
+        run: echo "ARCHITECTURE=${{ matrix.architecture }}" >> $GITHUB_ENV
+
+      - name: Install dependents
+        run: |
+          if [ $RUNNER_OS == 'Linux' ]; then
+            sudo apt-get update 
+            sudo apt-get install libcurl4-openssl-dev libssl-dev ninja-build -y
+          elif [ $RUNNER_OS == 'Windows' ]; then
+            choco install ninja gcc
+          elif [ $RUNNER_OS == 'macOS' ]; then
+            brew install ninja
+          fi
+
+      - name: Configure CMake
+        run: |
+          mkdir -p build
+          
+          if [ $RUNNER_OS == 'Windows' ]; then
+            cmake -S . -B ./build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE="$Env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -GNinja
+          fi
+
+            cmake -S . -B ./build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -GNinja
+        working-directory: ${{github.workspace}}
+
+      - name: Build
+        run: cmake --build ./build --config ${{env.BUILD_TYPE}}
+        working-directory: ${{github.workspace}}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-${{ matrix.architecture }}-${{ env.BUILD_TYPE }}
+          path: build/bin/*
