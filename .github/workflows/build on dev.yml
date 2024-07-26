@@ -58,7 +58,7 @@ jobs:
           else
             cmake -S . -B ./build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -GNinja
           fi
-            working-directory: ${{github.workspace}}
+        working-directory: ${{github.workspace}}
         shell: bash
 
       - name: Build
