@@ -1,0 +1,62 @@
+on:
+  pull_request:
+    branches: 
+      - main
+
+env:
+  BUILD_TYPE: Release
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        platform:
+          - ubuntu-latest
+          - windows-latest
+        architecture:
+          - x64
+          - arm64
+          - x86
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+  
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Set architecture
+        run: echo "ARCHITECTURE=${{ matrix.architecture }}" >> $GITHUB_ENV
+
+      - name: Install dependents
+        run: |
+          if [ $RUNNER_OS == 'Linux' ]; then
+            sudo apt-get update 
+            sudo apt-get install libcurl4-openssl-dev libssl-dev ninja-build -y
+          fi
+        shell: bash
+
+      - name: Configure CMake
+        run: |
+          mkdir -p build
+          if [ $RUNNER_OS == 'Windows' ]; then
+            cmake -S . -B ./build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          else
+            cmake -S . -B ./build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -GNinja
+          fi
+        working-directory: ${{github.workspace}}
+        shell: bash
+
+      - name: Build
+        run: cmake --build ./build --config ${{env.BUILD_TYPE}}
+        working-directory: ${{github.workspace}}
+        shell: bash
