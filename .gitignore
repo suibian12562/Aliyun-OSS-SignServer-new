@@ -44,3 +44,4 @@ build/
 ./vcpkg_installed
 config.json
 bucket.json
+docker-compose.yml

@@ -31,5 +31,8 @@ CMAkeLists.txt
 vcpkg.json
 src/
 .github/
+.vscode/
+build/
+vcpkg_installed/
 
 
